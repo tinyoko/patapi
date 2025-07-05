@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>特許情報検索アプリ v1.1</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .search-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .search-button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .search-button:hover {
+            background-color: #2980b9;
+        }
+        
+        .search-button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results-section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        
+        .error-message {
+            background-color: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .success-message {
+            background-color: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .patent-info {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        
+        .patent-info h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        
+        .patent-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .patent-table th,
+        .patent-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .patent-table th {
+            background-color: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .patent-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .json-view {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        
+        .view-toggle {
+            margin-bottom: 20px;
+        }
+        
+        .view-toggle button {
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin-right: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .view-toggle button.active {
+            background-color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>特許情報検索システム</h1>
+            <p>特許出願番号を入力して、特許情報を検索してください</p>
+        </div>
+        
+        <div class="search-section">
+            <form id="searchForm">
+                <div class="form-group">
+                    <label for="applicationNumber">特許出願番号</label>
+                    <input type="text" id="applicationNumber" name="applicationNumber" 
+                           placeholder="例：2016045210" required>
+                </div>
+                <button type="submit" class="search-button" id="searchButton">検索</button>
+            </form>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>特許情報を取得中...</p>
+        </div>
+        
+        <div class="results-section" id="resultsSection">
+            <div id="messageArea"></div>
+            <div class="view-toggle" id="viewToggle" style="display: none;">
+                <button onclick="showTableView()" id="tableViewBtn" class="active">テーブル表示</button>
+                <button onclick="showJsonView()" id="jsonViewBtn">JSON表示</button>
+            </div>
+            <div id="tableView"></div>
+            <div id="jsonView" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('searchForm');
+        const searchButton = document.getElementById('searchButton');
+        const loading = document.getElementById('loading');
+        const resultsSection = document.getElementById('resultsSection');
+        const messageArea = document.getElementById('messageArea');
+        const viewToggle = document.getElementById('viewToggle');
+        const tableView = document.getElementById('tableView');
+        const jsonView = document.getElementById('jsonView');
+
+        searchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const applicationNumber = document.getElementById('applicationNumber').value.trim();
+            
+            if (!applicationNumber) {
+                showMessage('出願番号を入力してください', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/search/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        application_number: applicationNumber
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResults(data.data);
+                    showMessage('特許情報を取得しました', 'success');
+                } else {
+                    showMessage(data.error || '検索に失敗しました', 'error');
+                }
+            } catch (error) {
+                showMessage('ネットワークエラーが発生しました', 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function showLoading() {
+            searchButton.disabled = true;
+            loading.style.display = 'block';
+            resultsSection.style.display = 'none';
+        }
+
+        function hideLoading() {
+            searchButton.disabled = false;
+            loading.style.display = 'none';
+        }
+
+        function showMessage(message, type) {
+            const messageClass = type === 'error' ? 'error-message' : 'success-message';
+            messageArea.innerHTML = `<div class="${messageClass}">${message}</div>`;
+            resultsSection.style.display = 'block';
+        }
+
+        function showResults(data) {
+            console.log('showResults called with data:', data);
+            viewToggle.style.display = 'block';
+            
+            // テーブル表示
+            let tableHtml = '<div class="patent-info"><h3>特許情報</h3>';
+            
+            function addTableRow(key, value, isHeader = false) {
+                if (isHeader || (value !== null && value !== undefined && value !== '')) {
+                    const headerClass = isHeader ? ' style="background-color: #f0f0f0; font-weight: bold;"' : '';
+                    const displayValue = isHeader ? '' : value;
+                    tableHtml += `<tr${headerClass}><td>${key}</td><td>${displayValue}</td></tr>`;
+                }
+            }
+            
+            // 特許庁APIの応答形式に対応
+            if (data && typeof data === 'object') {
+                // 基本情報
+                tableHtml += '<table class="patent-table">';
+                tableHtml += '<thead><tr><th>項目</th><th>内容</th></tr></thead><tbody>';
+                
+                // ステータス情報
+                if (data.statusCode) {
+                    addTableRow('ステータスコード', data.statusCode);
+                }
+                if (data.errorMessage) {
+                    addTableRow('エラーメッセージ', data.errorMessage);
+                }
+                if (data.remainAccessCount) {
+                    addTableRow('残りアクセス回数', data.remainAccessCount);
+                }
+                
+                // 実際のデータ構造に基づく表示
+                console.log('Full data structure:', data);
+                
+                // data.dataではなく、dataオブジェクト直下に特許データがある
+                if (data.data && typeof data.data === 'object') {
+                    const patentData = data.data;
+                    console.log('Found data.data:', patentData);
+                    
+                    // 基本情報（重複削除済み）
+                    // この部分は下のresultセクションで処理される
+                    
+                    // 出願人情報
+                    if (patentData.applicantAttorney && Array.isArray(patentData.applicantAttorney)) {
+                        addTableRow('=== 出願人・代理人情報 ===', '', true);
+                        patentData.applicantAttorney.forEach((attorney, index) => {
+                            attorney.name && addTableRow(`${index + 1}. 名称`, attorney.name);
+                        });
+                    }
+                } else {
+                    // data.dataが存在しない場合、dataオブジェクト直下を解析
+                    console.log('No data.data found, parsing data object directly');
+                    console.log('Available keys in data:', Object.keys(data));
+                    
+                    // 基本情報セクション（重複削除済み）
+                    // この部分は下のresultセクションで処理される
+                    
+                    // フィールドの存在確認とログ出力
+                    console.log('applicationNumber:', data.applicationNumber);
+                    console.log('inventionTitle:', data.inventionTitle);
+                    
+                    if (data.applicationNumber) addTableRow('出願番号', data.applicationNumber);
+                    if (data.inventionTitle) addTableRow('発明の名称', data.inventionTitle);
+                    if (data.filingDate) addTableRow('出願日', data.filingDate);
+                    if (data.publicationDate) addTableRow('公開日', data.publicationDate);
+                    if (data.registrationDate) addTableRow('登録日', data.registrationDate);
+                    if (data.registrationNumber) addTableRow('登録番号', data.registrationNumber);
+                    
+                    // 出願人情報セクション
+                    if (data.applicantAttorney && Array.isArray(data.applicantAttorney)) {
+                        addTableRow('=== 出願人・代理人情報 ===', '', true);
+                        data.applicantAttorney.forEach((attorney, index) => {
+                            if (attorney.name) {
+                                addTableRow(`${index + 1}. 名称`, attorney.name);
+                                attorney.applicantAttorneyCd && addTableRow(`${index + 1}. コード`, attorney.applicantAttorneyCd);
+                                attorney.applicantAttorneyClass && addTableRow(`${index + 1}. 分類`, attorney.applicantAttorneyClass);
+                            }
+                        });
+                    }
+                    
+                    // 書誌情報セクション
+                    if (data.bibliographyInformation && Array.isArray(data.bibliographyInformation)) {
+                        addTableRow('=== 書誌情報 ===', '', true);
+                        data.bibliographyInformation.forEach((bib, index) => {
+                            if (bib.documentDescription) {
+                                addTableRow(`${index + 1}. 文書説明`, bib.documentDescription);
+                                bib.documentNumber && addTableRow(`${index + 1}. 文書番号`, bib.documentNumber);
+                            }
+                        });
+                    }
+                    
+                    // 実際のデータ構造を解析
+                    console.log('Full data keys:', Object.keys(data));
+                    
+                    // resultキーに特許データが含まれているかチェック
+                    if (data.result && typeof data.result === 'object') {
+                        const parsedData = data.result;
+                        console.log('Found data.result as object:', parsedData);
+                        console.log('Keys in data.result:', Object.keys(parsedData));
+                        
+                        // data.result.dataに実際の特許データがある場合をチェック
+                        let actualPatentData = parsedData;
+                        if (parsedData.data && typeof parsedData.data === 'object') {
+                            actualPatentData = parsedData.data;
+                            console.log('Found nested data in result:', actualPatentData);
+                        }
+                            
+                        // 実際の特許データから情報を抽出
+                        addTableRow('=== 基本情報 ===', '', true);
+                        if (actualPatentData.applicationNumber) {
+                            addTableRow('出願番号', actualPatentData.applicationNumber);
+                        }
+                        if (actualPatentData.inventionTitle) {
+                            addTableRow('発明の名称', actualPatentData.inventionTitle);
+                        }
+                        if (actualPatentData.filingDate) {
+                            addTableRow('出願日', actualPatentData.filingDate);
+                        }
+                        if (actualPatentData.publicationDate) {
+                            addTableRow('公開日', actualPatentData.publicationDate);
+                        }
+                        if (actualPatentData.registrationDate) {
+                            addTableRow('登録日', actualPatentData.registrationDate);
+                        }
+                        if (actualPatentData.registrationNumber) {
+                            addTableRow('登録番号', actualPatentData.registrationNumber);
+                        }
+                        
+                        // 出願人情報
+                        if (actualPatentData.applicantAttorney && Array.isArray(actualPatentData.applicantAttorney)) {
+                            addTableRow('=== 出願人・代理人情報 ===', '', true);
+                            actualPatentData.applicantAttorney.forEach((attorney, index) => {
+                                if (attorney.name) {
+                                    addTableRow(`${index + 1}. 名称`, attorney.name);
+                                    if (attorney.applicantAttorneyCd) {
+                                        addTableRow(`${index + 1}. コード`, attorney.applicantAttorneyCd);
+                                    }
+                                    if (attorney.applicantAttorneyClass) {
+                                        addTableRow(`${index + 1}. 分類`, attorney.applicantAttorneyClass);
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // 書誌情報
+                        if (actualPatentData.bibliographyInformation && Array.isArray(actualPatentData.bibliographyInformation)) {
+                            addTableRow('=== 書誌情報 ===', '', true);
+                            actualPatentData.bibliographyInformation.forEach((bib, index) => {
+                                addTableRow(`書誌${index + 1}. 番号種別`, bib.numberType || '');
+                                addTableRow(`書誌${index + 1}. 番号`, bib.number || '');
+                                
+                                // 文書リスト
+                                if (bib.documentList && Array.isArray(bib.documentList)) {
+                                    bib.documentList.forEach((doc, docIndex) => {
+                                        addTableRow(`書誌${index + 1}.${docIndex + 1} 法定日付`, doc.legalDate || '');
+                                        addTableRow(`書誌${index + 1}.${docIndex + 1} 文書コード`, doc.documentCode || '');
+                                        addTableRow(`書誌${index + 1}.${docIndex + 1} 文書説明`, doc.documentDescription || '');
+                                        addTableRow(`書誌${index + 1}.${docIndex + 1} 文書番号`, doc.documentNumber || '');
+                                    });
+                                }
+                            });
+                        }
+                        
+                        // その他の重要な情報
+                        addTableRow('=== 特許期間・状態情報 ===', '', true);
+                        if (actualPatentData.expireDate) {
+                            addTableRow('満了日', actualPatentData.expireDate);
+                        }
+                        if (actualPatentData.disappearanceDate) {
+                            addTableRow('消滅日', actualPatentData.disappearanceDate);
+                        }
+                        if (actualPatentData.erasureIdentifier) {
+                            addTableRow('消去識別子', actualPatentData.erasureIdentifier);
+                        }
+                        
+                        // 公開番号情報
+                        if (actualPatentData.publicationNumber || actualPatentData.ADPublicationNumber) {
+                            addTableRow('=== 公開番号情報 ===', '', true);
+                            if (actualPatentData.publicationNumber) {
+                                addTableRow('公開番号', actualPatentData.publicationNumber);
+                            }
+                            if (actualPatentData.ADPublicationNumber) {
+                                addTableRow('AD公開番号', actualPatentData.ADPublicationNumber);
+                            }
+                        }
+                        
+                        // 国際出願情報
+                        if (actualPatentData.internationalApplicationNumber || actualPatentData.internationalPublicationNumber) {
+                            addTableRow('=== 国際出願情報 ===', '', true);
+                            if (actualPatentData.internationalApplicationNumber) {
+                                addTableRow('国際出願番号', actualPatentData.internationalApplicationNumber);
+                            }
+                            if (actualPatentData.internationalPublicationNumber) {
+                                addTableRow('国際公開番号', actualPatentData.internationalPublicationNumber);
+                            }
+                            if (actualPatentData.internationalPublicationDate) {
+                                addTableRow('国際公開日', actualPatentData.internationalPublicationDate);
+                            }
+                        }
+                        
+                        // 優先権情報（もしあれば）
+                        if (actualPatentData.priorityRightInformation && Array.isArray(actualPatentData.priorityRightInformation) && actualPatentData.priorityRightInformation.length > 0) {
+                            addTableRow('=== 優先権情報 ===', '', true);
+                            actualPatentData.priorityRightInformation.forEach((priority, index) => {
+                                addTableRow(`優先権${index + 1}`, JSON.stringify(priority));
+                            });
+                        }
+                        
+                        // 親出願情報（もしあれば）
+                        if (actualPatentData.parentApplicationInformation && Object.keys(actualPatentData.parentApplicationInformation).length > 0) {
+                            addTableRow('=== 親出願情報 ===', '', true);
+                            addTableRow('親出願情報', JSON.stringify(actualPatentData.parentApplicationInformation));
+                        }
+                        
+                        // 分割出願情報（もしあれば）
+                        if (actualPatentData.divisionalApplicationInformation && Array.isArray(actualPatentData.divisionalApplicationInformation) && actualPatentData.divisionalApplicationInformation.length > 0) {
+                            addTableRow('=== 分割出願情報 ===', '', true);
+                            actualPatentData.divisionalApplicationInformation.forEach((division, index) => {
+                                addTableRow(`分割出願${index + 1}`, JSON.stringify(division));
+                            });
+                        }
+                    } else {
+                        addTableRow('データなし', 'data.resultが見つかりません');
+                        addTableRow('=== 利用可能なトップレベルキー ===', '', true);
+                        addTableRow('キー一覧', Object.keys(data).join(', '));
+                        
+                        // デバッグ: 各キーの内容を確認
+                        Object.keys(data).forEach(key => {
+                            if (!['statusCode', 'errorMessage', 'remainAccessCount'].includes(key)) {
+                                const value = data[key];
+                                addTableRow(`${key}の型`, typeof value);
+                                if (typeof value === 'object' && value !== null) {
+                                    addTableRow(`${key}の内容`, JSON.stringify(value).substring(0, 200) + '...');
+                                } else {
+                                    addTableRow(`${key}の値`, value);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // その他の重要な情報
+                    const importantFields = [
+                        'nationalPublicationNumber', 'nationalApplicationNumber', 
+                        'internationalApplicationNumber', 'internationalPublicationNumber',
+                        'internationalPublicationDate', 'priorityRightsnformation'
+                    ];
+                    
+                    const hasOtherInfo = importantFields.some(field => data[field] && data[field] !== '');
+                    if (hasOtherInfo) {
+                        addTableRow('=== その他の情報 ===', '', true);
+                        importantFields.forEach(field => {
+                            if (data[field] && data[field] !== '') {
+                                addTableRow(field, data[field]);
+                            }
+                        });
+                    }
+                }
+                
+                tableHtml += '</tbody></table>';
+            } else {
+                tableHtml += '<p>データの表示に問題があります。</p>';
+            }
+            
+            tableHtml += '</div>';
+            tableView.innerHTML = tableHtml;
+            
+            // JSON表示
+            jsonView.innerHTML = `<div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
+        }
+
+        function showTableView() {
+            tableView.style.display = 'block';
+            jsonView.style.display = 'none';
+            document.getElementById('tableViewBtn').classList.add('active');
+            document.getElementById('jsonViewBtn').classList.remove('active');
+        }
+
+        function showJsonView() {
+            tableView.style.display = 'none';
+            jsonView.style.display = 'block';
+            document.getElementById('tableViewBtn').classList.remove('active');
+            document.getElementById('jsonViewBtn').classList.add('active');
+        }
+    </script>
+</body>
+</html>
