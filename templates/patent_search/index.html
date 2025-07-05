@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>特許情報検索アプリ v1.1</title>
+    <title>特許情報検索・OPD統合アプリ v1.2</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -190,24 +190,159 @@
         .view-toggle button.active {
             background-color: #3498db;
         }
+        
+        .api-tabs {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .api-tabs button {
+            background-color: transparent;
+            border: none;
+            padding: 12px 20px;
+            margin-right: 5px;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+        }
+        
+        .api-tabs button.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+            font-weight: 600;
+        }
+        
+        .api-tabs button:hover {
+            color: #2980b9;
+        }
+        
+        .api-section {
+            display: none;
+        }
+        
+        .api-section.active {
+            display: block;
+        }
+        
+        .opd-features {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .opd-features h4 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        
+        .opd-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .opd-button {
+            background-color: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .opd-button:hover {
+            background-color: #229954;
+        }
+        
+        .opd-button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .text-content {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .text-section {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .text-section:last-child {
+            border-bottom: none;
+        }
+        
+        .text-section h4 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .text-section p {
+            line-height: 1.6;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>特許情報検索システム</h1>
-            <p>特許出願番号を入力して、特許情報を検索してください</p>
+            <h1>特許情報検索・OPD統合システム</h1>
+            <p>特許出願番号を入力して、特許経過情報とOPD書類情報を検索してください</p>
         </div>
         
         <div class="search-section">
-            <form id="searchForm">
-                <div class="form-group">
-                    <label for="applicationNumber">特許出願番号</label>
-                    <input type="text" id="applicationNumber" name="applicationNumber" 
-                           placeholder="例：2016045210" required>
-                </div>
-                <button type="submit" class="search-button" id="searchButton">検索</button>
-            </form>
+            <div class="api-tabs">
+                <button onclick="switchTab('patent')" id="patentTab" class="active">特許経過情報</button>
+                <button onclick="switchTab('opd')" id="opdTab">OPD書類情報</button>
+            </div>
+            
+            <!-- 特許経過情報タブ -->
+            <div id="patentSection" class="api-section active">
+                <form id="searchForm">
+                    <div class="form-group">
+                        <label for="applicationNumber">特許出願番号</label>
+                        <input type="text" id="applicationNumber" name="applicationNumber" 
+                               placeholder="例：2016045210" required>
+                    </div>
+                    <button type="submit" class="search-button" id="searchButton">検索</button>
+                </form>
+            </div>
+            
+            <!-- OPD書類情報タブ -->
+            <div id="opdSection" class="api-section">
+                <form id="opdForm">
+                    <div class="form-group">
+                        <label for="opdApplicationNumber">特許出願番号（OPD）</label>
+                        <input type="text" id="opdApplicationNumber" name="opdApplicationNumber" 
+                               placeholder="例：2016045210" required>
+                    </div>
+                    <div class="opd-features">
+                        <h4>OPD機能</h4>
+                        <p>ワン・ポータル・ドシエ（OPD）APIを使用して、XML形式の書類実体から日本語テキストを抽出します。</p>
+                        <p>対象：明細書、特許請求の範囲、図面の簡単な説明など</p>
+                    </div>
+                    <div class="opd-actions">
+                        <button type="button" class="opd-button" id="getDocListButton" onclick="getOPDDocuments()">書類一覧取得</button>
+                        <button type="button" class="opd-button" id="extractTextButton" onclick="extractJPText()">JP書類テキスト抽出</button>
+                    </div>
+                </form>
+            </div>
         </div>
         
         <div class="loading" id="loading">
@@ -229,12 +364,15 @@
     <script>
         const searchForm = document.getElementById('searchForm');
         const searchButton = document.getElementById('searchButton');
+        const opdForm = document.getElementById('opdForm');
         const loading = document.getElementById('loading');
         const resultsSection = document.getElementById('resultsSection');
         const messageArea = document.getElementById('messageArea');
         const viewToggle = document.getElementById('viewToggle');
         const tableView = document.getElementById('tableView');
         const jsonView = document.getElementById('jsonView');
+        
+        let currentTab = 'patent';
 
         searchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -291,11 +429,20 @@
             resultsSection.style.display = 'block';
         }
 
-        function showResults(data) {
-            console.log('showResults called with data:', data);
+        function showResults(data, resultType = 'patent') {
+            console.log('showResults called with data:', data, 'type:', resultType);
             viewToggle.style.display = 'block';
             
-            // テーブル表示
+            // 結果タイプに応じた表示
+            if (resultType === 'jp-text') {
+                displayJPTextResults(data);
+                return;
+            } else if (resultType === 'opd-documents') {
+                displayOPDDocumentList(data);
+                return;
+            }
+            
+            // 通常の特許情報表示
             let tableHtml = '<div class="patent-info"><h3>特許情報</h3>';
             
             function addTableRow(key, value, isHeader = false) {
@@ -561,6 +708,77 @@
             // JSON表示
             jsonView.innerHTML = `<div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
         }
+        
+        // JP書類テキスト結果の表示
+        function displayJPTextResults(data) {
+            let html = '<div class="patent-info"><h3>JP書類テキスト抽出結果</h3>';
+            
+            if (data.extracted_documents && Object.keys(data.extracted_documents).length > 0) {
+                html += `<p><strong>出願番号:</strong> ${data.application_number}</p>`;
+                html += `<p><strong>抽出文書数:</strong> ${data.document_count}件</p>`;
+                
+                // 各文書のテキストを表示
+                Object.entries(data.extracted_documents).forEach(([filename, sections]) => {
+                    html += `<div class="text-content">`;
+                    html += `<h4>📄 ${filename}</h4>`;
+                    
+                    if (Array.isArray(sections) && sections.length > 0) {
+                        sections.forEach(section => {
+                            if (section.title && section.content) {
+                                html += `<div class="text-section">`;
+                                html += `<h4>${section.title}</h4>`;
+                                html += `<p>${section.content}</p>`;
+                                html += `</div>`;
+                            }
+                        });
+                    } else {
+                        html += `<p>テキスト情報が見つかりませんでした。</p>`;
+                    }
+                    
+                    html += `</div>`;
+                });
+            } else {
+                html += '<p>抽出されたテキストがありません。</p>';
+            }
+            
+            html += '</div>';
+            tableView.innerHTML = html;
+            
+            // JSON表示
+            jsonView.innerHTML = `<div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
+        }
+        
+        // OPD書類一覧結果の表示
+        function displayOPDDocumentList(data) {
+            let html = '<div class="patent-info"><h3>OPD書類一覧</h3>';
+            
+            if (data && typeof data === 'object') {
+                // 基本情報
+                html += '<table class="patent-table">';
+                html += '<thead><tr><th>項目</th><th>内容</th></tr></thead><tbody>';
+                
+                // データ構造に応じて表示
+                Object.entries(data).forEach(([key, value]) => {
+                    if (value !== null && value !== undefined && value !== '') {
+                        if (typeof value === 'object') {
+                            html += `<tr><td>${key}</td><td>${JSON.stringify(value, null, 2)}</td></tr>`;
+                        } else {
+                            html += `<tr><td>${key}</td><td>${value}</td></tr>`;
+                        }
+                    }
+                });
+                
+                html += '</tbody></table>';
+            } else {
+                html += '<p>書類一覧データの表示に問題があります。</p>';
+            }
+            
+            html += '</div>';
+            tableView.innerHTML = html;
+            
+            // JSON表示
+            jsonView.innerHTML = `<div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
+        }
 
         function showTableView() {
             tableView.style.display = 'block';
@@ -574,6 +792,108 @@
             jsonView.style.display = 'block';
             document.getElementById('tableViewBtn').classList.remove('active');
             document.getElementById('jsonViewBtn').classList.add('active');
+        }
+        
+        // タブ切り替え機能
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            // タブボタンのアクティブ状態を更新
+            document.getElementById('patentTab').classList.remove('active');
+            document.getElementById('opdTab').classList.remove('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // セクションの表示/非表示を更新
+            document.getElementById('patentSection').classList.remove('active');
+            document.getElementById('opdSection').classList.remove('active');
+            document.getElementById(tabName + 'Section').classList.add('active');
+            
+            // 結果エリアをクリア
+            resultsSection.style.display = 'none';
+            messageArea.innerHTML = '';
+        }
+        
+        // OPD書類一覧取得
+        async function getOPDDocuments() {
+            const applicationNumber = document.getElementById('opdApplicationNumber').value.trim();
+            
+            if (!applicationNumber) {
+                showMessage('出願番号を入力してください', 'error');
+                return;
+            }
+            
+            const button = document.getElementById('getDocListButton');
+            button.disabled = true;
+            button.textContent = '取得中...';
+            
+            try {
+                const response = await fetch('/opd/documents/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        application_number: applicationNumber
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResults(data.data, 'opd-documents');
+                    showMessage('OPD書類一覧を取得しました', 'success');
+                } else {
+                    showMessage(data.error || 'OPD書類一覧の取得に失敗しました', 'error');
+                }
+            } catch (error) {
+                showMessage('ネットワークエラーが発生しました', 'error');
+            } finally {
+                button.disabled = false;
+                button.textContent = '書類一覧取得';
+            }
+        }
+        
+        // JP書類テキスト抽出
+        async function extractJPText() {
+            const applicationNumber = document.getElementById('opdApplicationNumber').value.trim();
+            
+            if (!applicationNumber) {
+                showMessage('出願番号を入力してください', 'error');
+                return;
+            }
+            
+            const button = document.getElementById('extractTextButton');
+            button.disabled = true;
+            button.textContent = '抽出中...';
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/opd/jp-text/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        application_number: applicationNumber
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResults(data.data, 'jp-text');
+                    showMessage(`JP書類テキストを抽出しました（${data.data.document_count}件の文書）`, 'success');
+                } else {
+                    showMessage(data.error || 'JP書類テキストの抽出に失敗しました', 'error');
+                }
+            } catch (error) {
+                showMessage('ネットワークエラーが発生しました', 'error');
+            } finally {
+                hideLoading();
+                button.disabled = false;
+                button.textContent = 'JP書類テキスト抽出';
+            }
         }
     </script>
 </body>

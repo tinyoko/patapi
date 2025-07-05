@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-3m#8g2n0uf65db9#up+=m&%tzs
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if os.getenv('ALLOWED_HOSTS') else ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['*']  # 開発用: すべてのホストを許可
 
 # Security settings for production
 if not DEBUG:
@@ -152,5 +152,10 @@ CORS_ALLOW_CREDENTIALS = True
 PATENT_API_BASE_URL = os.getenv('PATENT_API_BASE_URL', 'https://ip-data.jpo.go.jp')
 PATENT_API_USERNAME = os.getenv('PATENT_API_USERNAME', '')
 PATENT_API_PASSWORD = os.getenv('PATENT_API_PASSWORD', '')
-PATENT_API_TOKEN_URL = os.getenv('PATENT_API_TOKEN_URL', 'https://ip-data.jpo.go.jp/token')
+PATENT_API_TOKEN_URL = os.getenv('PATENT_API_TOKEN_URL', 'https://ip-data.jpo.go.jp/auth/token')
 PATENT_API_DATA_URL = os.getenv('PATENT_API_DATA_URL', 'https://ip-data.jpo.go.jp/api/patent/v1/app_progress')
+
+# OPD API settings
+OPD_API_BASE_URL = os.getenv('OPD_API_BASE_URL', 'https://ip-data.jpo.go.jp')
+OPD_API_DOC_LIST_URL = os.getenv('OPD_API_DOC_LIST_URL', 'https://ip-data.jpo.go.jp/api/opd/v1/global_doc_list')
+OPD_API_DOC_CONTENT_URL = os.getenv('OPD_API_DOC_CONTENT_URL', 'https://ip-data.jpo.go.jp/api/opd/v1/jp_doc_cont')
