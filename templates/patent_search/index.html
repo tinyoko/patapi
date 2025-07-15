@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>特許情報検索アプリ v1.1</title>
+    <title>特許情報検索アプリ v2.0 - 多機能API対応</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -80,6 +80,45 @@
         .search-button:disabled {
             background-color: #bdc3c7;
             cursor: not-allowed;
+        }
+        
+        .api-selector {
+            margin-bottom: 20px;
+        }
+        
+        .api-selector select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            background-color: white;
+            transition: border-color 0.3s ease;
+        }
+        
+        .api-selector select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .api-info {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #2c3e50;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        .input-group .form-group {
+            flex: 1;
+            margin-bottom: 0;
         }
         
         .loading {
@@ -195,18 +234,43 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>特許情報検索システム</h1>
-            <p>特許出願番号を入力して、特許情報を検索してください</p>
+            <h1>特許情報検索システム v2.0</h1>
+            <p>14種類の特許情報APIから選択して、特許情報を検索してください</p>
         </div>
         
         <div class="search-section">
             <form id="searchForm">
-                <div class="form-group">
-                    <label for="applicationNumber">特許出願番号</label>
-                    <input type="text" id="applicationNumber" name="applicationNumber" 
-                           placeholder="例：2016045210" required>
+                <div class="form-group api-selector">
+                    <label for="apiType">API種類</label>
+                    <select id="apiType" name="apiType" onchange="updateInputFields()">
+                        <option value="app_progress">1. 特許経過情報API</option>
+                        <option value="app_progress_simple">2. シンプル特許経過情報API</option>
+                        <option value="divisional_app_info">3. 特許分割出願情報API</option>
+                        <option value="priority_right_app_info">4. 特許優先基礎出願情報API</option>
+                        <option value="applicant_attorney_cd">5. 特許申請人氏名・名称API</option>
+                        <option value="applicant_attorney_name">6. 特許申請人コードAPI</option>
+                        <option value="pub_num">7. 特許出願公開番号API</option>
+                        <option value="reg_num">8. 特許登録番号API</option>
+                        <option value="app_doc_cont_refusal_reason_decision">9. 特許発送書類の実体ファイルAPI</option>
+                        <option value="app_doc_cont_refusal_reason">10. 特許拒絶理由通知書API</option>
+                        <option value="cite_doc_info">11. 特許引用文献情報取得API</option>
+                        <option value="registration_info">12. 特許登録情報API</option>
+                        <option value="jpp_fixed_address">13. 特許J-PlatPat固定アドレスAPI</option>
+                        <option value="pct_app_num">14. 特許PCT出願の日本国内移行後の出願番号API</option>
+                    </select>
+                    <div class="api-info" id="apiInfo">
+                        出願番号に基づき経過情報の一覧を取得します。最も包括的な特許情報を提供します。
+                    </div>
                 </div>
-                <button type="submit" class="search-button" id="searchButton">検索</button>
+                
+                <div class="input-group">
+                    <div class="form-group">
+                        <label for="searchInput" id="inputLabel">特許出願番号</label>
+                        <input type="text" id="searchInput" name="searchInput" 
+                               placeholder="例：2016045210" required>
+                    </div>
+                    <button type="submit" class="search-button" id="searchButton">検索</button>
+                </div>
             </form>
         </div>
         
@@ -239,10 +303,11 @@
         searchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const applicationNumber = document.getElementById('applicationNumber').value.trim();
+            const apiType = document.getElementById('apiType').value;
+            const searchInput = document.getElementById('searchInput').value.trim();
             
-            if (!applicationNumber) {
-                showMessage('出願番号を入力してください', 'error');
+            if (!searchInput) {
+                showMessage('検索値を入力してください', 'error');
                 return;
             }
             
@@ -255,7 +320,8 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        application_number: applicationNumber
+                        api_type: apiType,
+                        search_input: searchInput
                     })
                 });
                 
@@ -291,12 +357,30 @@
             resultsSection.style.display = 'block';
         }
 
-        function showResults(data) {
-            console.log('showResults called with data:', data);
+        function showResults(data, apiType, searchInput) {
+            console.log('showResults called with data:', data, 'apiType:', apiType);
             viewToggle.style.display = 'block';
             
-            // テーブル表示
-            let tableHtml = '<div class="patent-info"><h3>特許情報</h3>';
+            // APIタイプに応じたタイトルを設定
+            const apiTitles = {
+                'app_progress': '特許経過情報',
+                'app_progress_simple': 'シンプル特許経過情報',
+                'divisional_app_info': '分割出願情報',
+                'priority_right_app_info': '優先権基礎出願情報',
+                'applicant_attorney_cd': '申請人情報',
+                'applicant_attorney_name': '申請人コード情報',
+                'pub_num': '公開番号情報',
+                'reg_num': '登録番号情報',
+                'app_doc_cont_refusal_reason_decision': '発送書類情報',
+                'app_doc_cont_refusal_reason': '拒絶理由通知書情報',
+                'cite_doc_info': '引用文献情報',
+                'registration_info': '登録情報',
+                'jpp_fixed_address': 'J-PlatPat固定アドレス情報',
+                'pct_app_num': 'PCT出願国内移行情報'
+            };
+            
+            const title = apiTitles[apiType] || '特許情報';
+            let tableHtml = `<div class="patent-info"><h3>${title} (検索値: ${searchInput})</h3>`;
             
             function addTableRow(key, value, isHeader = false) {
                 if (isHeader || (value !== null && value !== undefined && value !== '')) {
@@ -308,11 +392,10 @@
             
             // 特許庁APIの応答形式に対応
             if (data && typeof data === 'object') {
-                // 基本情報
                 tableHtml += '<table class="patent-table">';
                 tableHtml += '<thead><tr><th>項目</th><th>内容</th></tr></thead><tbody>';
                 
-                // ステータス情報
+                // ステータス情報（共通）
                 if (data.statusCode) {
                     addTableRow('ステータスコード', data.statusCode);
                 }
@@ -321,6 +404,52 @@
                 }
                 if (data.remainAccessCount) {
                     addTableRow('残りアクセス回数', data.remainAccessCount);
+                }
+                
+                // ファイルダウンロード系APIの場合
+                if (data.message && data.content_type) {
+                    addTableRow('メッセージ', data.message);
+                    addTableRow('コンテンツタイプ', data.content_type);
+                    addTableRow('コンテンツサイズ', data.content_length);
+                    addTableRow('注意', 'ファイルダウンロード系APIは実際のファイルダウンロードはこのデモではサポートされていません。');
+                }
+                
+                // シンプルデータ表示（申請人コード・PCT等）
+                else if (apiType === 'applicant_attorney_cd' || apiType === 'applicant_attorney_name' || 
+                    apiType === 'pub_num' || apiType === 'reg_num' || apiType === 'pct_app_num' ||
+                    apiType === 'jpp_fixed_address') {
+                    Object.keys(data).forEach(key => {
+                        if (key !== 'statusCode' && key !== 'errorMessage' && key !== 'remainAccessCount') {
+                            const value = data[key];
+                            if (value !== null && value !== undefined && value !== '') {
+                                if (Array.isArray(value)) {
+                                    addTableRow(key, value.join(', '));
+                                } else if (typeof value === 'object') {
+                                    addTableRow(key, JSON.stringify(value));
+                                } else {
+                                    addTableRow(key, value);
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // 複雑なデータ構造（特許経過情報等）
+                else {
+                    Object.keys(data).forEach(key => {
+                        if (key !== 'statusCode' && key !== 'errorMessage' && key !== 'remainAccessCount') {
+                            const value = data[key];
+                            if (value !== null && value !== undefined && value !== '') {
+                                if (Array.isArray(value)) {
+                                    addTableRow(key, value.length > 0 ? JSON.stringify(value) : 'データなし');
+                                } else if (typeof value === 'object') {
+                                    addTableRow(key, JSON.stringify(value));
+                                } else {
+                                    addTableRow(key, value);
+                                }
+                            }
+                        }
+                    });
                 }
                 
                 // 実際のデータ構造に基づく表示
@@ -575,6 +704,98 @@
             document.getElementById('tableViewBtn').classList.remove('active');
             document.getElementById('jsonViewBtn').classList.add('active');
         }
+        
+        function updateInputFields() {
+            const apiType = document.getElementById('apiType').value;
+            const inputLabel = document.getElementById('inputLabel');
+            const searchInput = document.getElementById('searchInput');
+            const apiInfo = document.getElementById('apiInfo');
+            
+            const apiConfigs = {
+                'app_progress': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '出願番号に基づき経過情報の一覧を取得します。最も包括的な特許情報を提供します。'
+                },
+                'app_progress_simple': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '優先権基礎情報などを除いた簡易的な経過情報を取得します。'
+                },
+                'divisional_app_info': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '分割出願に関する情報を取得します。原出願と分割出願の関係性を確認できます。'
+                },
+                'priority_right_app_info': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '優先権に関する基礎出願情報を取得します。パリ条約優先権、国内優先権情報を確認できます。'
+                },
+                'applicant_attorney_cd': {
+                    label: '申請人コード',
+                    placeholder: '例：123456789',
+                    info: '申請人コードから氏名・名称を取得します。'
+                },
+                'applicant_attorney_name': {
+                    label: '申請人名称',
+                    placeholder: '例：株式会社○○',
+                    info: '申請人名称から申請人コードを取得します。'
+                },
+                'pub_num': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '出願番号から公開番号を取得します。'
+                },
+                'reg_num': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '出願番号から登録番号を取得します。'
+                },
+                'app_doc_cont_refusal_reason_decision': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '特許出願に関する発送書類の実体ファイルをZIPでダウンロードします。'
+                },
+                'app_doc_cont_refusal_reason': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '拒絶理由通知書の実体ファイルをZIPでダウンロードします。'
+                },
+                'cite_doc_info': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '拒絶理由の引用文献情報を取得します。'
+                },
+                'registration_info': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: '特定の出願番号の登録情報を取得します。'
+                },
+                'jpp_fixed_address': {
+                    label: '特許出願番号',
+                    placeholder: '例：2016045210',
+                    info: 'J-PlatPat固定アドレス情報を取得します。'
+                },
+                'pct_app_num': {
+                    label: 'PCT出願番号',
+                    placeholder: '例：PCT/JP2016/000001',
+                    info: 'PCT出願番号から日本国内移行後の出願番号を取得します。'
+                }
+            };
+            
+            const config = apiConfigs[apiType];
+            inputLabel.textContent = config.label;
+            searchInput.placeholder = config.placeholder;
+            apiInfo.textContent = config.info;
+        }
+    </script>
+    
+    <script>
+        // ページ読み込み時に初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateInputFields();
+        });
     </script>
 </body>
 </html>
